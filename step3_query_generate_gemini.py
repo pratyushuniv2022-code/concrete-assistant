@@ -141,9 +141,22 @@ Instructions:
 """
     return prompt
 
-def generate_answer_conversational(current_question, conversation_history):
-    """Generate answer using Gemini LLM with hybrid-ranked passages and conversation context."""
-    passages = retrieve_passages(current_question)
+def generate_answer_conversational(current_question, conversation_history, top_chunks=None):
+    """
+    Generate answer using Gemini LLM with conversation context.
+    Optionally pass top_chunks retrieved from Qdrant to reduce latency.
+    """
+    # Build minimal context from retrieved Qdrant passages
+    passages = []
+    if top_chunks:
+        for hit in top_chunks:
+            payload = hit.payload or {}
+            passages.append({
+                "text": payload.get("snippet") or payload.get("text") or "",
+                "source": payload.get("source", "unknown"),
+                "page": payload.get("page", -1),
+                "score": getattr(hit, "score", 0.0)
+            })
     ranked_passages = hybrid_rank(passages, current_question)
     prompt = build_prompt(current_question, conversation_history, ranked_passages)
 
@@ -155,7 +168,7 @@ def generate_answer_conversational(current_question, conversation_history):
     )
     return getattr(resp, "text", str(resp))
 
-# ---------------- Demo: Progressive conversation ----------------
+# ---------------- Demo ----------------
 if __name__ == "__main__":
     conversation_history = []
     print("Enter 'exit' to quit.\n")
@@ -163,7 +176,14 @@ if __name__ == "__main__":
         user_q = input("You: ").strip()
         if user_q.lower() in ["exit", "quit"]:
             break
-        answer = generate_answer_conversational(user_q, conversation_history)
+        # Fetch top-k from Qdrant
+        query_vector = [0.0]*384  # dummy placeholder; replace with embeddings if available
+        results = qdrant_client.search(
+            collection_name=COLLECTION_NAME,
+            query_vector=query_vector,
+            limit=TOP_K,
+            with_payload=True
+        )
+        answer = generate_answer_conversational(user_q, conversation_history, top_chunks=results[:3])
         print("\nAssistant:", answer, "\n")
-        # store conversation as dict for progressive context
         conversation_history.append({"user": user_q, "assistant": answer})
