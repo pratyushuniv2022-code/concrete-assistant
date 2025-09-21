@@ -120,31 +120,25 @@ if uploaded_pdf:
     st.success(f"Uploaded {uploaded_pdf.name} successfully!")
     index_pdf_to_qdrant(pdf_path, CORE_COLL, doc_type="user_pdf")
 
-# ---------------- Ask Question ----------------
+# ---------------- Session state ----------------
+if "history" not in st.session_state:
+    st.session_state.history = []
+
+# ... UI code, uploads, etc.
+
 user_question = st.text_input("Ask me about concrete:")
 if user_question:
     qdrant = get_qdrant_client()
-    
-    # Embed only the user question
     query_vector = embedder.encode([user_question])[0].tolist()
-    
-    # Search top-k relevant chunks from Qdrant
-    results = qdrant.search(
-        collection_name=CORE_COLL,
-        query_vector=query_vector,
-        limit=TOP_K,
-        with_payload=True
-    )
-    
-    # Reduce to minimal top 3 chunks for faster LLM response
+    results = qdrant.search(collection_name=CORE_COLL, query_vector=query_vector, limit=TOP_K, with_payload=True)
     top_chunks = results[:3] if results else []
 
-    # Generate answer using Gemini LLM
-    start_time = time.time()
+    # call the generator
     answer = generate_answer_conversational(user_question, st.session_state.history, top_chunks=top_chunks)
-    elapsed = time.time() - start_time
-    
-    # Display answer and log conversation
+
+    # display
     st.markdown(f"**Assistant:** {answer}")
     st.write(f"*Response time: {elapsed:.2f}s*")
+
+    # append safely (history already initialized above)
     st.session_state.history.append({"user": user_question, "assistant": answer})
