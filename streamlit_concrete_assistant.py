@@ -1,5 +1,7 @@
 # streamlit_concrete_assistant_fast.py
 # Importing necessary library
+import os
+os.environ["STREAMLIT_WATCHDOG_IGNORE"] = "true"
 import streamlit as st
 from pathlib import Path
 import uuid
