@@ -14,14 +14,17 @@ DEFAULT_RETRY_DELAY = 1.5
 
 # ---------------- Qdrant Cloud values ----------------
 # Replace these with your actual Qdrant Cloud URL & API Key
-CLOUD_QDRANT_URL = "https://d9da8062-7ac5-46ca-9a98-cdb6561e520c.europe-west3-0.gcp.cloud.qdrant.io:6333"
-CLOUD_QDRANT_API_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhY2Nlc3MiOiJtIn0.1PSdadgsA0bI7aN_mBcD5AFk4zksd5ioaS-GeaTLfLA"
+# CLOUD_QDRANT_URL = "https://d9da8062-7ac5-46ca-9a98-cdb6561e520c.europe-west3-0.gcp.cloud.qdrant.io:6333"
+# CLOUD_QDRANT_API_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhY2Nlc3MiOiJtIn0.1PSdadgsA0bI7aN_mBcD5AFk4zksd5ioaS-GeaTLfLA"
+
+QDRANT_URL = os.environ.get("QDRANT_URL", "https://d9da8062-7ac5-46ca-9a98-cdb6561e520c.europe-west3-0.gcp.cloud.qdrant.io:6333")
+QDRANT_API_KEY = os.environ.get("QDRANT_API_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhY2Nlc3MiOiJtIn0.1PSdadgsA0bI7aN_mBcD5AFk4zksd5ioaS-GeaTLfLA")
 
 # ---------------- Read from environment (fallback to defaults) ----------------
 QDRANT_HOST = os.environ.get("QDRANT_HOST", DEFAULT_QDRANT_HOST)
 QDRANT_PORT = int(os.environ.get("QDRANT_PORT", DEFAULT_QDRANT_PORT))
-QDRANT_URL = os.environ.get("QDRANT_URL", CLOUD_QDRANT_URL)        # Cloud-ready
-QDRANT_API_KEY = os.environ.get("QDRANT_API_KEY", CLOUD_QDRANT_API_KEY)
+# QDRANT_URL = os.environ.get("QDRANT_URL", CLOUD_QDRANT_URL)        # Cloud-ready
+# QDRANT_API_KEY = os.environ.get("QDRANT_API_KEY", CLOUD_QDRANT_API_KEY)
 
 CORE_COLL = os.environ.get("CORE_COLL", DEFAULT_CORE_COLL)
 LOCAL_MODEL = os.environ.get("LOCAL_MODEL", DEFAULT_LOCAL_MODEL)
