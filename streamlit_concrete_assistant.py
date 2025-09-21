@@ -126,7 +126,7 @@ if user_question:
     # Embed only the user question
     query_vector = embedder.encode([user_question])[0].tolist()
     
-    # Search top-k relevant chunks
+    # Search top-k relevant chunks from Qdrant
     results = qdrant.search(
         collection_name=CORE_COLL,
         query_vector=query_vector,
@@ -134,21 +134,15 @@ if user_question:
         with_payload=True
     )
     
-    # Prepare minimal context for LLM
-    top_chunks = results[:3]  # take only top 3
-    context = "\n".join([h.payload["snippet"] for h in top_chunks])
-    
-    # Generate answer
+    # Reduce to minimal top 3 chunks for faster LLM response
+    top_chunks = results[:3] if results else []
+
+    # Generate answer using Gemini LLM
     start_time = time.time()
-    answer = generate_answer_conversational(user_question, st.session_state.history, context=context)
+    answer = generate_answer_conversational(user_question, st.session_state.history, top_chunks=top_chunks)
     elapsed = time.time() - start_time
+    
+    # Display answer and log conversation
     st.markdown(f"**Assistant:** {answer}")
     st.write(f"*Response time: {elapsed:.2f}s*")
     st.session_state.history.append({"user": user_question, "assistant": answer})
-
-# ---------------- Conversation History ----------------
-if st.checkbox("Show conversation history"):
-    for turn in st.session_state.history:
-        st.markdown(f"**You:** {turn['user']}")
-        st.markdown(f"**Assistant:** {turn['assistant']}")
-        st.write("---")
