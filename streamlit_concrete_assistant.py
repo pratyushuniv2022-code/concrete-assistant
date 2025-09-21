@@ -1,24 +1,25 @@
-# streamlit_concrete_assistant_cloud.py
+# streamlit_concrete_assistant_fast.py
+#Importing necessary packages
 import streamlit as st
 from pathlib import Path
 import uuid
 import hashlib
 import time
-from config_env import QDRANT_URL, QDRANT_API_KEY, CORE_COLL, LOCAL_MODEL, CORE_PDF_DIR, BATCH_SIZE
+from config_env import QDRANT_URL, QDRANT_API_KEY, CORE_COLL, LOCAL_MODEL, CORE_PDF_DIR, BATCH_SIZE, TOP_K
 from sentence_transformers import SentenceTransformer
 from qdrant_client import QdrantClient
 from qdrant_client.http import models as qm
 from PyPDF2 import PdfReader
 
-# ---------------- Initialize ----------------
+# ---------------- Streamlit UI ----------------
 st.set_page_config(page_title="Concrete Assistant 💬", layout="wide")
 st.title("Concrete Assistant 💬")
 st.write("Ask questions about concrete or upload your own PDFs for context.")
 
-# Embedder
+# ---------------- Embedder ----------------
 embedder = SentenceTransformer(LOCAL_MODEL)
 
-# Lazy Qdrant client
+# ---------------- Lazy Qdrant client ----------------
 _qdrant = None
 def get_qdrant_client():
     global _qdrant
@@ -111,8 +112,26 @@ if uploaded_pdf:
 user_question = st.text_input("Ask me about concrete:")
 if user_question:
     from step3_query_generate_gemini import generate_answer_conversational
+    qdrant = get_qdrant_client()
+    
+    # Embed only the user question
+    query_vector = embedder.encode([user_question])[0].tolist()
+    
+    # Search top-k relevant chunks
+    results = qdrant.search(
+        collection_name=CORE_COLL,
+        query_vector=query_vector,
+        limit=TOP_K,
+        with_payload=True
+    )
+    
+    # Prepare minimal context for LLM
+    top_chunks = results[:3]  # take only top 3
+    context = "\n".join([h.payload["snippet"] for h in top_chunks])
+    
+    # Generate answer
     start_time = time.time()
-    answer = generate_answer_conversational(user_question, st.session_state.history)
+    answer = generate_answer_conversational(user_question, st.session_state.history, context=context)
     elapsed = time.time() - start_time
     st.markdown(f"**Assistant:** {answer}")
     st.write(f"*Response time: {elapsed:.2f}s*")
@@ -124,4 +143,3 @@ if st.checkbox("Show conversation history"):
         st.markdown(f"**You:** {turn['user']}")
         st.markdown(f"**Assistant:** {turn['assistant']}")
         st.write("---")
-
