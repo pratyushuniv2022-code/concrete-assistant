@@ -1,15 +1,16 @@
 # streamlit_concrete_assistant_fast.py
-#Importing necessary packages
+# Importing necessary library
 import streamlit as st
 from pathlib import Path
 import uuid
 import hashlib
 import time
-from config_env import QDRANT_URL, QDRANT_API_KEY, CORE_COLL, LOCAL_MODEL, CORE_PDF_DIR, BATCH_SIZE, TOP_K
+from config_env import QDRANT_URL, QDRANT_API_KEY, CORE_COLL, LOCAL_MODEL, TOP_K
 from sentence_transformers import SentenceTransformer
 from qdrant_client import QdrantClient
 from qdrant_client.http import models as qm
 from PyPDF2 import PdfReader
+from step3_query_generate_gemini import generate_answer_conversational
 
 # ---------------- Streamlit UI ----------------
 st.set_page_config(page_title="Concrete Assistant 💬", layout="wide")
@@ -17,7 +18,10 @@ st.title("Concrete Assistant 💬")
 st.write("Ask questions about concrete or upload your own PDFs for context.")
 
 # ---------------- Embedder ----------------
-embedder = SentenceTransformer(LOCAL_MODEL)
+embedder = SentenceTransformer(
+    LOCAL_MODEL, 
+    use_auth_token=st.secrets["HUGGINGFACEHUB_API_TOKEN"]
+)
 
 # ---------------- Lazy Qdrant client ----------------
 _qdrant = None
@@ -25,7 +29,6 @@ def get_qdrant_client():
     global _qdrant
     if _qdrant is None:
         _qdrant = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY, check_compatibility=False)
-        # ensure collection exists
         VECTOR_DIM = embedder.get_sentence_embedding_dimension()
         existing = [c.name for c in _qdrant.get_collections().collections]
         if CORE_COLL not in existing:
@@ -55,7 +58,7 @@ def chunk_text(text, chunk_size=600, overlap=200):
         i += chunk_size - overlap
     return chunks
 
-def index_pdf_to_qdrant(pdf_path, collection_name):
+def index_pdf_to_qdrant(pdf_path, collection_name, doc_type="user_pdf"):
     qdrant = get_qdrant_client()
     pages = extract_pages(pdf_path)
     texts, metadatas = [], []
@@ -68,7 +71,7 @@ def index_pdf_to_qdrant(pdf_path, collection_name):
                 "source": pdf_path.name,
                 "page": pg["page"],
                 "chunk_index": idx,
-                "type": "user_pdf",
+                "type": doc_type,
                 "stable_id": stable,
                 "snippet": c[:1000]
             })
@@ -89,6 +92,7 @@ UPLOAD_DIR = Path("user_uploaded_pdfs")
 UPLOAD_DIR.mkdir(exist_ok=True)
 
 # ---------------- Core PDFs ----------------
+CORE_PDF_DIR = Path("core_pdfs")
 CORE_PDF_DIR.mkdir(exist_ok=True)
 pdf_files = list(CORE_PDF_DIR.glob("*.pdf"))
 with st.expander("📄 View/Download Core PDFs"):
@@ -99,6 +103,12 @@ with st.expander("📄 View/Download Core PDFs"):
     else:
         st.info("No core PDFs found. Place them in the 'core_pdfs' folder.")
 
+# Pre-index core PDFs (once)
+if st.button("🔹 Pre-embed Core PDFs (fast startup)"):
+    for pdf_file in pdf_files:
+        index_pdf_to_qdrant(pdf_file, CORE_COLL, doc_type="core")
+    st.success("Core PDFs pre-embedded!")
+
 # ---------------- Upload PDFs ----------------
 uploaded_pdf = st.file_uploader("Upload your PDF for Q&A", type="pdf")
 if uploaded_pdf:
@@ -106,12 +116,11 @@ if uploaded_pdf:
     with open(pdf_path, "wb") as f:
         f.write(uploaded_pdf.getbuffer())
     st.success(f"Uploaded {uploaded_pdf.name} successfully!")
-    index_pdf_to_qdrant(pdf_path, CORE_COLL)
+    index_pdf_to_qdrant(pdf_path, CORE_COLL, doc_type="user_pdf")
 
 # ---------------- Ask Question ----------------
 user_question = st.text_input("Ask me about concrete:")
 if user_question:
-    from step3_query_generate_gemini import generate_answer_conversational
     qdrant = get_qdrant_client()
     
     # Embed only the user question
