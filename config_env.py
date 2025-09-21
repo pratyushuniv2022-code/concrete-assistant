@@ -27,6 +27,7 @@ CORE_COLL = os.environ.get("CORE_COLL", DEFAULT_CORE_COLL)
 LOCAL_MODEL = os.environ.get("LOCAL_MODEL", DEFAULT_LOCAL_MODEL)
 
 CORE_PDF_DIR = Path(os.environ.get("CORE_PDF_DIR", DEFAULT_CORE_PDF_DIR))
+TOP_K = int(os.environ.get("TOP_K", 5))
 BATCH_SIZE = int(os.environ.get("BATCH_SIZE", DEFAULT_BATCH_SIZE))
 RETRY_ATTEMPTS = int(os.environ.get("RETRY_ATTEMPTS", DEFAULT_RETRY_ATTEMPTS))
 RETRY_DELAY = float(os.environ.get("RETRY_DELAY", DEFAULT_RETRY_DELAY))
